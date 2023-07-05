@@ -256,6 +256,9 @@ jobs:
     container:
       image: "ubuntu:${{ matrix.release_num }}"
       options: --privileged
+      credentials:
+        username: werwolv
+        password: ${{ secrets.DOCKER_KEY }}
 
     steps:
       - name: ⬇️ Install git
