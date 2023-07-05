@@ -233,13 +233,25 @@ jobs:
     strategy:
       matrix:
         include:
-          - name: Ubuntu
+          - name: Ubuntu x86_64
             release_num: 22.04
-          - name: Ubuntu
+            runs_on: ubuntu-latest
+            arch: x86_64
+          - name: Ubuntu x86_64
             release_num: 23.04
+            runs_on: ubuntu-latest
+            arch: x86_64
+          - name: Ubuntu ARM64
+            release_num: 22.04
+            runs_on: [self-hosted, linux, ARM64, Ubuntu_22.04]
+            arch: ARM64
+          - name: Ubuntu ARM64
+            release_num: 23.04
+            runs_on: [self-hosted, linux, ARM64, Ubuntu_22.04]
+            arch: ARM64
 
-    name: 🐧 Ubuntu ${{ matrix.release_num }}
-    runs-on: ubuntu-latest
+    name: 🐧 ${{ matrix.name }} ${{ matrix.release_num }}
+    runs-on: ${{ matrix.runs_on }}
 
     container:
       image: "ubuntu:${{ matrix.release_num }}"
@@ -257,8 +269,8 @@ jobs:
       - name: 📜 Setup ccache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-${{ github.run_id }}
-          restore-keys: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build
+          key: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-${{ matrix.name }}-${{ github.run_id }}
+          restore-keys: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-${{ matrix.name }}
           max-size: 50M
 
       - name: 📜 Restore CMakeCache
@@ -266,7 +278,7 @@ jobs:
         with:
           path: |
             build/CMakeCache.txt
-          key: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-${{ matrix.name }}-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: ⬇️ Install dependencies
         run: |
@@ -303,75 +315,12 @@ jobs:
         run: |
           cp -r build/DEBIAN build/DebDir
           dpkg-deb -Zgzip --build build/DebDir
-          mv build/DebDir.deb imhex-${{env.IMHEX_VERSION}}-Ubuntu-${{ matrix.release_num }}-x86_64.deb
+          mv build/DebDir.deb imhex-${{env.IMHEX_VERSION}}-Ubuntu-${{ matrix.release_num }}-${{ matrix.arch }}.deb
 
       - name: ⬆️ Upload DEB
         uses: actions/upload-artifact@v3
         with:
-          name: Ubuntu ${{ matrix.release_num }} DEB x86_64
-          path: '*.deb'
-
-  ubuntu_arm64:
-    runs-on: [self-hosted, linux, ARM64, Ubuntu_22.04]
-    name: 🐧 Ubuntu 22.04 ARM64
-    steps:
-
-      - name: 🧰 Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
-      - name: 📜 Setup ccache
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-arm-${{ github.run_id }}
-          restore-keys: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-arm
-          max-size: 50M
-
-      - name: 📜 Restore CMakeCache
-        uses: actions/cache@v3
-        with:
-          path: |
-            build/CMakeCache.txt
-          key: ${{ runner.os }}-${{ secrets.CACHE_VERSION }}-build-arm-${{ hashFiles('**/CMakeLists.txt') }}
-
-      - name: ⬇️ Install dependencies
-        run: |
-          sudo apt update
-          sudo bash dist/get_deps_debian.sh
-
-      # Ubuntu cmake build
-      - name: 🛠️ Build
-        run: |
-          mkdir -p build
-          cd build
-          CC=gcc-12 CXX=g++-12 cmake                      \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE                \
-            -DCMAKE_INSTALL_PREFIX="/usr"                 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache            \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache          \
-            -DIMHEX_PATTERNS_PULL_MASTER=ON               \
-            -DIMHEX_COMMIT_HASH_SHORT="${GITHUB_SHA::7}"  \
-            -DIMHEX_COMMIT_HASH_LONG="${GITHUB_SHA}"      \
-            -DIMHEX_COMMIT_BRANCH="${GITHUB_REF##*/}"     \
-            -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON       \
-            ..
-          make -j 4 install DESTDIR=DebDir
-
-      - name: 📜 Set version variable
-        run: |
-          echo "IMHEX_VERSION=`cat VERSION`" >> $GITHUB_ENV
-
-      - name: 📦 Bundle DEB
-        run: |
-          cp -r build/DEBIAN build/DebDir
-          dpkg-deb -Zgzip --build build/DebDir
-          mv build/DebDir.deb imhex-${{env.IMHEX_VERSION}}-Ubuntu-22.04-x86_64.deb
-
-      - name: ⬆️ Upload DEB
-        uses: actions/upload-artifact@v3
-        with:
-          name: Ubuntu 22.04 DEB ARM64
+          name: Ubuntu ${{ matrix.release_num }} DEB ${{ matrix.arch }}
           path: '*.deb'
 
   # AppImage build
