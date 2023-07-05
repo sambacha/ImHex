@@ -262,7 +262,9 @@ jobs:
 
     steps:
       - name: ⬇️ Install git
-        run: apt update && apt install -y git
+        run: |
+          apt update && apt install -y git
+          git config --global --add safe.directory '*'
 
       - name: 🧰 Checkout
         uses: actions/checkout@v3
