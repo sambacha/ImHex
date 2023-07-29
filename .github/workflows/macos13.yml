@@ -92,12 +92,21 @@ jobs:
         ..
         ninja install
 
+# 
+# 
+#```bash
+# $ xcrun -sdk macosx --show-sdk-platform-version
+# 13.3
+# $ xcrun -sdk macosx --show-sdk-path
+# /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.3.sdk
+#```
     - name: 'MacOS 13 Env'
       run: |
         echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
         echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
-        echo "${{ env.MACOSX_DEPLOYMENT_TARGET }}"
-        echo "${{ env.SDKROOT }}"
+        echo "${{env.MACOSX_DEPLOYMENT_TARGET}}"
+        echo "${{env.SDKROOT}}"
+        
       id: macos13-env
 
     # MacOS cmake build
@@ -110,7 +119,8 @@ jobs:
         OBJC=$(brew --prefix llvm)/bin/clang                                                        \
         OBJCXX=$(brew --prefix llvm)/bin/clang++                                                    \
         PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig":"$(brew --prefix)/lib/pkgconfig"   \
-        MACOSX_DEPLOYMENT_TARGET="${{env.MACOSX_DEPLOYMENT_TARGET}}"                              \
+        MACOSX_DEPLOYMENT_TARGET="${{env.MACOSX_DEPLOYMENT_TARGET}}"                               \
+        CMAKE_OSX_SYSROOT="${{env.SDKROOT}}"
         cmake -G "Ninja"                                                                            \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}                                                    \
           -DCREATE_BUNDLE=ON                                                                        \
