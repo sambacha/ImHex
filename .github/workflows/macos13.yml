@@ -1,0 +1,137 @@
+name: macOS13
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: RelWithDebInfo
+
+jobs:
+
+  macos:
+    runs-on: macos-13
+
+    strategy:
+      matrix:
+        include:
+          - suffix: "-NoGPU"
+            custom_glfw: true
+          - suffix: ""
+            custom_glfw: false
+
+    name: 🍎 macOS 13.0${{matrix.suffix}}
+
+    steps:
+    - name: 🧰 Checkout
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: 📜 Set version variable
+      run: |
+        echo "IMHEX_VERSION=`cat VERSION`" >> $GITHUB_ENV
+
+    - name: 📜 Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ runner.os }}-${{ matrix.suffix }}-${{ secrets.CACHE_VERSION }}-build-${{ github.run_id }}
+        restore-keys: ${{ runner.os }}-${{ matrix.suffix }}-${{ secrets.CACHE_VERSION }}-build
+        max-size: 50M
+
+    - name: 📜 Restore CMakeCache
+      uses: actions/cache@v3
+      with:
+        path: |
+          build/CMakeCache.txt
+        key: ${{ runner.os }}-${{ matrix.suffix }}-${{ secrets.CACHE_VERSION }}-build-${{ hashFiles('**/CMakeLists.txt') }}
+
+    - name: ⬇️ Install dependencies
+      run: |
+        brew bundle --no-lock --file dist/Brewfile
+        rm -rf /usr/local/Cellar/capstone
+        brew install bash
+
+    - name: ⬇️ Install classic glfw
+      if: ${{! matrix.custom_glfw}}
+      run: |
+        brew install glfw
+
+ # .NET Core SDK: 7.0.102, 7.0.202, 7.0.302 is included in github actions runner 
+ # see <https://github.com/actions/runner-images/blob/main/images/macos/macos-13-Readme.md#language-and-runtime>
+
+
+    - name: 🧰 Checkout glfw
+      if: ${{matrix.custom_glfw}}
+      uses: actions/checkout@v3
+      with:
+        repository: glfw/glfw
+        path: glfw
+
+    - name: ⬇️ Patch and install custom glfw
+      if: ${{matrix.custom_glfw}}
+      run: |
+        cd glfw
+        git apply ../dist/macOS/0001-glfw-SW.patch
+
+        mkdir build
+        cd build
+
+        cmake -G "Ninja"                                \
+          -DBUILD_SHARED_LIBS=ON                        \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache            \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache          \
+          -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache         \
+          -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache       \
+          -DDOTNET_EXECUTABLE="/usr/local/bin/dotnet"   \
+          -DIMHEX_COMMIT_HASH_SHORT="${GITHUB_SHA::7}"  \
+          -DIMHEX_COMMIT_HASH_LONG="${GITHUB_SHA}"      \
+          -DIMHEX_COMMIT_BRANCH="${GITHUB_REF##*/}"     \
+        ..
+        ninja install
+
+    - name: 'MacOS 13 Env'
+      run: |
+        echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+        echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+        echo "${{ env.MACOSX_DEPLOYMENT_TARGET }}"
+        echo "${{ env.SDKROOT }}"
+      id: macos13-env
+
+    # MacOS cmake build
+    - name: 🛠️ Build
+      run: |
+        mkdir -p build
+        cd build
+        CC=$(brew --prefix gcc@12)/bin/gcc-12                                                       \
+        CXX=$(brew --prefix gcc@12)/bin/g++-12                                                      \
+        OBJC=$(brew --prefix llvm)/bin/clang                                                        \
+        OBJCXX=$(brew --prefix llvm)/bin/clang++                                                    \
+        PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig":"$(brew --prefix)/lib/pkgconfig"   \
+        MACOSX_DEPLOYMENT_TARGET="${{ env.MACOSX_DEPLOYMENT_TARGET }}"                              \
+        cmake -G "Ninja"                                                                            \
+          -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}                                                    \
+          -DCREATE_BUNDLE=ON                                                                        \
+          -DCREATE_PACKAGE=ON                                                                       \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache                                                        \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache                                                      \
+          -DCMAKE_OBJC_COMPILER_LAUNCHER=ccache                                                     \
+          -DCMAKE_OBJCXX_COMPILER_LAUNCHER=ccache                                                   \
+          -DIMHEX_PATTERNS_PULL_MASTER=ON                                                           \
+          -DIMHEX_COMMIT_HASH_SHORT="${GITHUB_SHA::7}"                                              \
+          -DIMHEX_COMMIT_HASH_LONG="${GITHUB_SHA}"                                                  \
+          -DIMHEX_COMMIT_BRANCH="${GITHUB_REF##*/}"                                                 \
+          -DCPACK_PACKAGE_FILE_NAME="imhex-${{env.IMHEX_VERSION}}-macOS${{matrix.suffix}}-arm64"   \
+          -DCMAKE_OSX_ARCHITECTURES='arm64'                                                       \
+          ..
+        ninja package
+      shell: bash
+      id: macos13-build
+      
+    - name: ⬆️ Upload DMG
+      uses: actions/upload-artifact@v3
+      with:
+        name: macOS DMG${{matrix.suffix}} arm64
+        path: build/*.dmg
