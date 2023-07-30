@@ -42,8 +42,19 @@ set(LIBIMHEX_SOURCES
         source/subcommands/subcommands.cpp
 )
 
+# FIXME: macOS13
+# Generate this path based on the env as opposed to hardcoding it
+# 
+# $ xcrun -sdk macosx --show-sdk-path
+# /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.3.sdk
+# $ xcrun -sdk macosx --show-sdk-platform-version
+# 13.3
+#
+# -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+# -DCMAKE_OSX_SYSROOT:PATH=${CMAKE_OSX_SYSROOT}
+
 if (APPLE)
-    set(OSX_11_0_SDK_PATH  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk)
+    set(OSX_11_0_SDK_PATH  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.3.sdk)
     if (NOT CMAKE_OSX_SYSROOT)
         if (IS_DIRECTORY ${OSX_11_0_SDK_PATH})
             set(CMAKE_OSX_SYSROOT ${OSX_11_0_SDK_PATH})
