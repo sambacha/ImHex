@@ -120,6 +120,8 @@ jobs:
         CXX=$(brew --prefix gcc)/bin/g++-                                                           \
         OBJC=$(brew --prefix llvm)/bin/clang                                                        \
         OBJCXX=$(brew --prefix llvm)/bin/clang++                                                    \
+        #set( ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/homebrew/opt/openssl@3/lib/pkgconfig" )
+        # /opt/homebrew/opt/openssl@3/lib/pkgconfig:/opt/homebrew/lib/pkgconfig:
         PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig":"$(brew --prefix)/lib/pkgconfig"   \
         MACOSX_DEPLOYMENT_TARGET="${{env.MACOSX_DEPLOYMENT_TARGET}}"                               \
         cmake                                                                                       \
