@@ -53,6 +53,7 @@ jobs:
         brew bundle --no-lock --file dist/Brewfile
         rm -rf /usr/local/Cellar/capstone
         brew install bash
+        brew install gcc@12
 
     - name: ⬇️ Install classic glfw
       if: ${{! matrix.custom_glfw}}
@@ -92,26 +93,38 @@ jobs:
         ..
         ninja install
 
+# 
+# 
+#```bash
+# $ xcrun -sdk macosx --show-sdk-platform-version
+# 13.3
+# $ xcrun -sdk macosx --show-sdk-path
+# /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX13.3.sdk
+#```
     - name: 'MacOS 13 Env'
       run: |
         echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
         echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
-        echo "${{ env.MACOSX_DEPLOYMENT_TARGET }}"
-        echo "${{ env.SDKROOT }}"
+        echo "${{env.MACOSX_DEPLOYMENT_TARGET}}"
+        echo "${{env.SDKROOT}}"
+        
       id: macos13-env
 
-    # MacOS cmake build
     - name: 🛠️ Build
       run: |
         mkdir -p build
         cd build
+        CC=$(brew --prefix gcc@12)/bin/gcc-12     \
+        CXX=$(brew --prefix gcc@12)/bin/g++-12    \
         CC=$(brew --prefix gcc)/bin/gcc-                                                            \
         CXX=$(brew --prefix gcc)/bin/g++-                                                           \
         OBJC=$(brew --prefix llvm)/bin/clang                                                        \
         OBJCXX=$(brew --prefix llvm)/bin/clang++                                                    \
+        #set( ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:/opt/homebrew/opt/openssl@3/lib/pkgconfig" )
+        # /opt/homebrew/opt/openssl@3/lib/pkgconfig:/opt/homebrew/lib/pkgconfig:
         PKG_CONFIG_PATH="$(brew --prefix openssl)/lib/pkgconfig":"$(brew --prefix)/lib/pkgconfig"   \
-        MACOSX_DEPLOYMENT_TARGET="${{env.MACOSX_DEPLOYMENT_TARGET}}"                              \
-        cmake -G "Ninja"                                                                            \
+        MACOSX_DEPLOYMENT_TARGET="${{env.MACOSX_DEPLOYMENT_TARGET}}"                               \
+        cmake                                                                                       \
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}                                                    \
           -DCREATE_BUNDLE=ON                                                                        \
           -DCREATE_PACKAGE=ON                                                                       \
@@ -125,9 +138,10 @@ jobs:
           -DIMHEX_COMMIT_BRANCH="${GITHUB_REF##*/}"                                                 \
           -DCPACK_PACKAGE_FILE_NAME="imhex-${{env.IMHEX_VERSION}}-macOS${{matrix.suffix}}-arm64"   \
           -DCMAKE_OSX_ARCHITECTURES='arm64'                                                       \
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=1  \
+          --fresh \
           ..
-        ninja package
+        gmake -j4 package;
       shell: bash
       id: macos13-build
       
